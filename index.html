@@ -1022,58 +1022,72 @@
         });
         
         elements.importBtn.addEventListener('click', () => {
-            const importCode = elements.importData.value.trim();
-            if (!importCode) {
-                showNotification("No save data provided!");
-                return;
-            }
+    const importCode = elements.importData.value.trim();
+    if (!importCode) {
+        showNotification("No save data provided!");
+        return;
+    }
 
-            try {
-                // Decode Base64 string
-                const jsonString = decodeBase64(importCode);
-                
-                if (!jsonString) {
-                    throw new Error("Failed to decode save data");
-                }
-                
-                const saveData = JSON.parse(jsonString);
-                
-                // Validate save data
-                if (!saveData.version || !saveData.gameState) {
-                    throw new Error("Invalid save data format");
-                }
-                
-                // Log the imported data for debugging
-                console.log("Imported data:", JSON.stringify(saveData));
-                
-                // Reset current state to default before importing
-                resetGameState();
-                
-                // Apply imported state
-                for (const [key, value] of Object.entries(saveData.gameState)) {
-                    if (key !== 'achievements') {
-                        game[key] = value;
-                    }
-                }
-                
-                // Set session-specific data
-                game.sessionStartTime = Date.now();
-                game.sessionGrass = 0;
-                
-                // Update UI with imported state
-                initializeGame();
-                
-                // Check achievements
-                checkAchievements();
-                
-                closeModal('import-modal');
-                showNotification("Game data imported successfully!");
-                addToLog("Game imported successfully! Welcome back!");
-            } catch (error) {
-                console.error("Import error:", error);
-                showNotification("Error importing save data: " + error.message);
+    try {
+        // Decode Base64 string
+        const jsonString = decodeBase64(importCode);
+        
+        if (!jsonString) {
+            throw new Error("Failed to decode save data");
+        }
+        
+        const saveData = JSON.parse(jsonString);
+        
+        // Validate save data
+        if (!saveData || !saveData.gameState) {
+            throw new Error("Invalid save data format");
+        }
+        
+        // Reset current state before importing
+        resetGameState();
+        
+        // Apply imported state
+        for (const [key, value] of Object.entries(saveData.gameState)) {
+            if (key !== 'achievements' && key in game) {
+                game[key] = value;
             }
-        });
+        }
+        
+        // Set session-specific data
+        game.sessionStartTime = Date.now();
+        game.sessionGrass = 0;
+        
+        // Save imported game to localStorage immediately
+        saveGame();
+        
+        // Initialize UI components directly instead of calling initializeGame()
+        initializeToolsShop();
+        initializeAchievements();
+        updateHelperDisplay();
+        
+        // Force the time display to update with imported day count
+        elements.timeDisplay.textContent = `Day ${game.day} - ${game.isDay ? '🌞 Daytime' : '🌙 Nighttime'}`;
+        
+        updateUI();
+        
+        // Restart game cycles - important modification to properly sync day/night with imported data
+        if (window.dayCycleInterval) {
+            clearTimeout(window.dayCycleInterval);
+        }
+        startDayNightCycle();
+        startHelperAutomation();
+        
+        // Check achievements
+        checkAchievements();
+        
+        closeModal('import-modal');
+        showNotification("Game data imported successfully!");
+        addToLog("Game imported successfully! Welcome back!");
+    } catch (error) {
+        console.error("Import error:", error);
+        showNotification("Error importing save data: " + error.message);
+    }
+});
         
         // Support button
         elements.supportBtn.addEventListener('click', () => {
@@ -1685,10 +1699,19 @@
     // Ensure we start with day
     game.isDay = true;
     
+    // Add this flag to prevent day increment on first initialization
+    game.initializing = true;
+    
     // Function to handle day transition
     function startDay() {
         game.isDay = true;
-        game.day++;
+        
+        // Don't increment day on first initialization
+        if (!game.initializing) {
+            game.day++;
+        } else {
+            game.initializing = false;
+        }
         
         // Only switch to light mode during the day if the user isn't using system dark mode
         if (!window.matchMedia || !window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -1757,6 +1780,10 @@
         
         // Schedule night after day duration
         setTimeout(startNight, dayLength);
+
+	// At the end of the startDay function:
+	// Schedule night after day duration
+	window.dayCycleInterval = setTimeout(startNight, dayLength);
     }
     
     // Function to handle night transition
@@ -1779,6 +1806,10 @@
         
         // Schedule day after night duration
         setTimeout(startDay, nightLength);
+	
+	// At the end of the startNight function:
+	// Schedule day after night duration  
+	window.dayCycleInterval = setTimeout(startDay, nightLength);
     }
     
     // Start the cycle with day
