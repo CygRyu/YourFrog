@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Frog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        grass: '#4CAF50',
+                        frog: '#2E7D32',
+                        lily: '#8BC34A'
+                    },
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                        'cutting': 'cutting 0.5s infinite',
+                        'sleeping': 'sleeping 4s infinite',
+                        'rain': 'rain 1s infinite linear',
+                        'helper-move': 'helper-move 3s infinite alternate'
+                    },
+                    keyframes: {
+                        cutting: {
+                            '0%, 100%': { transform: 'rotate(-5deg)' },
+                            '50%': { transform: 'rotate(5deg)' }
+                        },
+                        sleeping: {
+                            '0%, 100%': { transform: 'scale(1.0)' },
+                            '50%': { transform: 'scale(1.05)' }
+                        },
+                        rain: {
+                            '0%': { transform: 'translateY(-10px)' },
+                            '100%': { transform: 'translateY(10px)' }
+                        },
+                        'helper-move': {
+                            '0%': { transform: 'translateX(-20px)' },
+                            '100%': { transform: 'translateX(20px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .achievement {
+            transition: all 0.3s ease;
+        }
+        .achievement.unlocked {
+            background-color: rgba(93, 92, 222, 0.1);
+        }
+        .achievement.locked {
+            filter: grayscale(1);
+            opacity: 0.7;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        /* Weather effects */
+        .weather-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .rain-drop {
+            position: absolute;
+            background: #5D9CE6;
+            width: 2px;
+            height: 10px;
+            opacity: 0.6;
+            border-radius: 1px;
+        }
+        .sun-ray {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle, rgba(255,235,59,0.7) 0%, rgba(255,235,59,0) 70%);
+            border-radius: 50%;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background-color: #5D5CDE;
+            color: white;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        .show-notification {
+            opacity: 1;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90%;
+            width: 450px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .dark .modal-content {
+            background-color: #1f2937;
+            color: white;
+        }
+        @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.5s ease-in-out;
+}
+    </style>
+</head>
+<body class="bg-green-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500">
+    <div id="notification" class="notification">Achievement unlocked!</div>
+    <div class="container mx-auto px-4 py-6 max-w-4xl">
+        <!-- Game Header -->
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-primary mb-2"></h1>
+            <div class="flex items-center justify-center gap-4">
+                <div id="time-display" class="text-xl font-semibold">Day 1 - 🌞 Daytime</div>
+                <div id="weather-display" class="text-xl">☀️ Sunny</div>
+            </div>
+            
+            <!-- Game Controls -->
+            <div class="flex justify-center mt-3 gap-2 flex-wrap">
+                <button id="save-game-btn" class="bg-primary hover:bg-purple-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    💾 Save Game
+                </button>
+                <button id="reset-game-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    🔄 Reset Game
+                </button>
+                <button id="export-game-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    📤 Export 
+                </button>
+                <button id="import-game-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    📥 Import 
+                </button>
+                <button id="support-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    ❤️ Support 
+                </button>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="mb-6 flex justify-center">
+            <div class="border-b border-gray-200 dark:border-gray-700">
+                <ul class="flex flex-wrap -mb-px text-sm font-medium text-center">
+                    <li class="mr-2">
+                        <a href="#" class="tab-link inline-block p-4 border-b-2 border-primary rounded-t-lg active" data-tab="main">Main</a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="#" class="tab-link inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:border-gray-300 dark:hover:border-gray-600" data-tab="upgrades">Upgrades</a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="#" class="tab-link inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:border-gray-300 dark:hover:border-gray-600" data-tab="automation">Automation</a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="#" class="tab-link inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:border-gray-300 dark:hover:border-gray-600" data-tab="achievements">Achievements</a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:border-gray-300 dark:hover:border-gray-600" data-tab="stats">Stats</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Tab Content -->
+        <div id="main-tab" class="tab-content active">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Game Status Section -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                    <div class="flex justify-between mb-3">
+                        <div>
+                            <h2 class="text-xl font-bold mb-2">Your Frog</h2>
+                            <div id="frog-container" class="h-36 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mb-3 relative overflow-hidden">
+                                <!-- Weather effects container -->
+                                <div id="weather-container" class="weather-container"></div>
+                                
+                                <!-- Grass background -->
+                                <div class="absolute inset-0 flex flex-wrap">
+                                    <div class="w-full h-full bg-grass opacity-20 dark:opacity-10"></div>
+                                </div>
+                                
+                                <!-- Frog character -->
+                                <div id="frog" class="text-4xl relative z-10">🐸</div>
+                                
+                                <!-- Sleep indicator -->
+                                <div id="sleep-indicator" class="hidden absolute top-3 right-3 text-xl">💤</div>
+                                
+                                <!-- Helper frogs -->
+                                <div id="helpers-container"></div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="mb-2">
+                                <span class="text-sm">Home Comfort:</span>
+                                <span id="comfort-level" class="font-bold">Basic</span>
+                            </div>
+                            <div id="furniture-display" class="flex flex-wrap justify-end gap-1">
+                                <!-- Furniture icons will be added here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Resources Display -->
+                    <div class="grid grid-cols-1 gap-3 mb-4">
+                        <div>
+                            <label class="text-sm font-medium">Grass Cut:</label>
+                            <div class="flex items-center">
+                                <span class="mr-2">🌿</span>
+                                <span id="grass-count" class="font-bold text-lg">0</span>
+                                <span class="ml-2 text-xs text-gray-500" id="grass-per-second"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Stamina Bar -->
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <label class="text-sm font-medium">Stamina:</label>
+                                <span id="stamina-text">100/100</span>
+                            </div>
+                            <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div id="stamina-bar" class="h-full bg-primary" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tool Display -->
+                        <div>
+                            <label class="text-sm font-medium">Current Tool:</label>
+                            <div class="flex items-center">
+                                <span id="tool-icon" class="mr-2">✂️</span>
+                                <span id="tool-name" class="font-bold">Basic Scissors</span>
+                                <span class="ml-2">- Power: <span id="cutting-power">1</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <button id="cut-grass-btn" class="w-full bg-primary hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                        Cut Grass
+                    </button>
+                </div>
+                
+                <!-- Shop & Upgrades Section -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                    <h2 class="text-xl font-bold mb-4">Shop</h2>
+                    
+                    <div class="space-y-4">
+                        <!-- Tools Shop -->
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <h3 class="font-bold mb-2">🛠️ Current Tools</h3>
+                            <div id="tools-shop" class="space-y-2">
+                                <!-- Tools will be added dynamically -->
+                            </div>
+                        </div>
+                        
+                        <!-- Furniture Shop -->
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <h3 class="font-bold mb-2">🪑 Furniture Shop</h3>
+                            <div id="furniture-shop" class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p>🌱 Small Plant</p>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400">A tiny decorative plant</p>
+                                    </div>
+                                    <button id="buy-plant" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                        Buy (100 🌿)
+                                    </button>
+                                </div>
+                                
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p>🛌 Lily Pad Bed</p>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400">Sleep better, recover faster</p>
+                                    </div>
+                                    <button id="buy-bed" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                        Buy (250 🌿)
+                                    </button>
+                                </div>
+                                
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p>🪑 Toadstool Chair</p>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400">Comfortable seating</p>
+                                    </div>
+                                    <button id="buy-chair" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                        Buy (500 🌿)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Upgrades Tab Content -->
+        <div id="upgrades-tab" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Regular Upgrades -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                    <h2 class="text-xl font-bold mb-4">Basic Upgrades</h2>
+                    <div class="space-y-4">
+                        <!-- Cutting Power Upgrade -->
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="font-bold">🔪 Sharper Blades</h3>
+                                <button id="upgrade-cutting" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Upgrade
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Cut more grass with each action (applies to all tools)</p>
+                            <p class="text-sm mt-1">Cost: <span id="cutting-cost" class="font-bold">10</span> 🌿</p>
+                            <p class="text-xs mt-1">Level: <span id="cutting-level">1</span></p>
+                        </div>
+                        
+                        <!-- Stamina Upgrade -->
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="font-bold">💪 Endurance</h3>
+                                <button id="upgrade-stamina" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Upgrade
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Increase maximum stamina</p>
+                            <p class="text-sm mt-1">Cost: <span id="stamina-cost" class="font-bold">15</span> 🌿</p>
+                            <p class="text-xs mt-1">Level: <span id="stamina-level">1</span></p>
+                        </div>
+                        
+                        <!-- Stamina Regen Upgrade -->
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="font-bold">🔄 Faster Recovery</h3>
+                                <button id="upgrade-regen" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Upgrade
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Recover stamina more quickly</p>
+                            <p class="text-sm mt-1">Cost: <span id="regen-cost" class="font-bold">20</span> 🌿</p>
+                            <p class="text-xs mt-1">Level: <span id="regen-level">1</span></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Special Upgrades -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                    <h2 class="text-xl font-bold mb-4">Special Upgrades</h2>
+                    <div class="space-y-4">
+                        <!-- Weather Forecast -->
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="font-bold">🌦️ Weather Forecast</h3>
+                                <button id="upgrade-weather" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Unlock
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Predict tomorrow's weather</p>
+                            <p class="text-sm mt-1">Cost: <span class="font-bold">100</span> 🌿</p>
+                            <p class="text-xs mt-1">Status: <span id="weather-forecast-status">Locked</span></p>
+                        </div>
+                        
+                        <!-- Lucky Clover -->
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="font-bold">🍀 Lucky Clover</h3>
+                                <button id="upgrade-luck" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Upgrade
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Occasionally find extra grass</p>
+                            <p class="text-sm mt-1">Cost: <span id="luck-cost" class="font-bold">50</span> 🌿</p>
+                            <p class="text-xs mt-1">Level: <span id="luck-level">0</span></p>
+                        </div>
+                        
+                        <!-- Rest Efficiency -->
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="font-bold">😴 Better Sleep</h3>
+                                <button id="upgrade-sleep" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Upgrade
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Recover more stamina during night</p>
+                            <p class="text-sm mt-1">Cost: <span id="sleep-cost" class="font-bold">40</span> 🌿</p>
+                            <p class="text-xs mt-1">Level: <span id="sleep-level">1</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Automation Tab Content -->
+        <div id="automation-tab" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Helper Frogs -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                    <h2 class="text-xl font-bold mb-4">Helper Frogs</h2>
+                    <p class="text-sm mb-4">Helper frogs automatically cut grass for you, even while you're away.</p>
+                    
+                    <!-- Helper Frog Purchase -->
+                    <div class="border dark:border-gray-700 rounded-lg p-3 mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <div>
+                                <h3 class="font-bold">🐸 Hire Helper Frog</h3>
+                                <p class="text-xs text-gray-600 dark:text-gray-400">Each helper cuts <span id="helper-power">1</span> grass every <span id="helper-speed">5</span> seconds</p>
+                            </div>
+                            <button id="buy-helper" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                Hire (100 🌿)
+                            </button>
+                        </div>
+                        <p class="text-sm">You have <span id="helper-count" class="font-bold">0</span> helper frogs</p>
+                    </div>
+                    
+                    <!-- Helper Frog Upgrades -->
+                    <div class="space-y-3">
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="font-bold">🔪 Helper Efficiency</h3>
+                                <button id="upgrade-helper-power" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Upgrade
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Helpers cut more grass per action</p>
+                            <p class="text-sm mt-1">Cost: <span id="helper-power-cost" class="font-bold">50</span> 🌿</p>
+                            <p class="text-xs mt-1">Level: <span id="helper-power-level">1</span></p>
+                        </div>
+                        
+                        <div class="border dark:border-gray-700 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="font-bold">⚡ Helper Speed</h3>
+                                <button id="upgrade-helper-speed" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Upgrade
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Helpers work faster</p>
+                            <p class="text-sm mt-1">Cost: <span id="helper-speed-cost" class="font-bold">75</span> 🌿</p>
+                            <p class="text-xs mt-1">Level: <span id="helper-speed-level">1</span></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Automation Status -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                    <h2 class="text-xl font-bold mb-4">Automation Status</h2>
+                    
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="font-medium">Production Overview:</p>
+                            <div class="text-right">
+                                <p class="text-sm">Manual: <span id="manual-rate" class="font-bold">0</span> 🌿/click</p>
+                                <p class="text-sm">Auto: <span id="auto-rate" class="font-bold">0</span> 🌿/sec</p>
+                            </div>
+                        </div>
+                        
+                        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div class="flex h-full">
+                                <div id="manual-bar" class="h-full bg-primary" style="width: 100%"></div>
+                                <div id="auto-bar" class="h-full bg-green-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="flex text-xs mt-1 justify-between">
+                            <span>Manual Production</span>
+                            <span>Auto Production</span>
+                        </div>
+                    </div>
+                    
+                    <div class="border dark:border-gray-700 rounded-lg p-3">
+                        <h3 class="font-bold mb-2">✨ Special Automation Features</h3>
+                        <div id="automation-features" class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p>🌧️ Rain Collector</p>
+                                    <p class="text-xs text-gray-600 dark:text-gray-400">Automatically collects extra grass during rain</p>
+                                </div>
+                                <button id="buy-rain-collector" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Buy (200 🌿)
+                                </button>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p>🌱 Night Worker</p>
+                                    <p class="text-xs text-gray-600 dark:text-gray-400">Helpers continue working during night</p>
+                                </div>
+                                <button id="buy-night-worker" class="bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors">
+                                    Buy (300 🌿)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Achievements Tab Content -->
+<div id="achievements-tab" class="tab-content">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+        <h2 class="text-xl font-bold mb-4">Achievements</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div id="achievements-container">
+                <!-- Achievements will be added dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+        <!-- Stats Tab Content -->
+        <div id="stats-tab" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- General Stats -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                    <h2 class="text-xl font-bold mb-4">Game Statistics</h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>🌿 Total Grass Cut:</span>
+                            <span id="stat-total-grass" class="font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>⏱️ Time Played:</span>
+                            <span id="stat-time-played" class="font-bold">0 minutes</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>🔪 Total Cuts Made:</span>
+                            <span id="stat-total-cuts" class="font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>🛌 Days Passed:</span>
+                            <span id="stat-days-passed" class="font-bold">1</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>💵 Grass Spent:</span>
+                            <span id="stat-grass-spent" class="font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>🏆 Achievements Unlocked:</span>
+                            <span id="stat-achievements" class="font-bold">0/0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Session Stats -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                    <h2 class="text-xl font-bold mb-4">Current Session</h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>⏱️ Session Length:</span>
+                            <span id="stat-session-time" class="font-bold">0 minutes</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>🌿 Grass This Session:</span>
+                            <span id="stat-session-grass" class="font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>📈 Grass Per Minute:</span>
+                            <span id="stat-grass-per-min" class="font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>🌤️ Weather Changes:</span>
+                            <span id="stat-weather-changes" class="font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>⚡ Current Production:</span>
+                            <span id="stat-current-production" class="font-bold">0 🌿/sec</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 dark:border-gray-700">
+                            <span>🧩 Game Version:</span>
+                            <span id="stat-game-version" class="font-bold">1.1.0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Game Log -->
+            <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                <h2 class="text-xl font-bold mb-2">Game Log</h2>
+                <div id="game-log" class="h-32 overflow-y-auto p-2 bg-gray-50 dark:bg-gray-900 rounded-md text-sm">
+                    <p>Welcome to your grass cutting adventure! Start by cutting some grass.</p>
+                </div>
+            </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-sm text-gray-600 dark:text-gray-400">
+            <p>Your Frog by CygRyu © 2025</p>
+            <div class="mt-2">
+                <a href="https://ko-fi.com/cygryu" target="_blank" class="text-primary hover:underline inline-flex items-center">
+                    <span class="mr-1">☕</span> Ko-fi
+                </a>
+                <span class="mx-2">|</span>
+                <a href="https://paypal.me/sofiansu?country.x=ID&locale.x=en_US" target="_blank" class="text-primary hover:underline inline-flex items-center">
+                    <span class="mr-1">💰</span> PayPal
+                </a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Export/Import Modal -->
+    <div id="export-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Export Game Data</h2>
+            <p class="mb-4 text-sm">Copy this code to save your game progress. You can use it to restore your game later or on another device.</p>
+            <textarea id="export-data" class="w-full h-32 p-2 border rounded-md mb-4 text-sm bg-gray-50 dark:bg-gray-900 dark:text-gray-200" readonly></textarea>
+            <div class="flex justify-end gap-2">
+                <button id="copy-export-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    Copy to Clipboard
+                </button>
+                <button class="close-modal bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="import-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Import Game Data</h2>
+            <p class="mb-4 text-sm">Paste your save code below to restore your game progress.</p>
+            <textarea id="import-data" class="w-full h-32 p-2 border rounded-md mb-4 text-sm bg-gray-50 dark:bg-gray-900 dark:text-gray-200" placeholder="Paste your save code here..."></textarea>
+            <div class="flex justify-end gap-2">
+                <button id="import-btn" class="bg-primary hover:bg-purple-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    Import Save
+                </button>
+                <button class="close-modal bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="support-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Support the Developer</h2>
+            <p class="mb-4">If you enjoy Your Frog, please consider supporting the developer! Your support helps create more free games like this one.</p>
+            
+            <div class="space-y-4">
+                <div class="border dark:border-gray-700 rounded-lg p-3">
+                    <h3 class="font-bold flex items-center mb-2">
+                        <span class="mr-2">☕</span> Support on Ko-fi
+                    </h3>
+                    <p class="text-sm mb-3">Buy me a coffee to fuel more game development!</p>
+                    <a href="https://ko-fi.com/cygryu" target="_blank" class="block w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-colors text-center">
+                        Visit Ko-fi Page
+                    </a>
+                </div>
+                
+                <div class="border dark:border-gray-700 rounded-lg p-3">
+                    <h3 class="font-bold flex items-center mb-2">
+                        <span class="mr-2">💰</span> Support via PayPal
+                    </h3>
+                    <p class="text-sm mb-3">Direct support through PayPal</p>
+                    <a href="https://paypal.me/sofiansu?country.x=ID&locale.x=en_US" target="_blank" class="block w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded-md transition-colors text-center">
+                        Donate via PayPal
+                    </a>
+                </div>
+            </div>
+            
+            <div class="mt-4 flex justify-end">
+                <button class="close-modal bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reset Confirmation Modal -->
+    <div id="reset-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Reset Game</h2>
+            <p class="mb-4">Are you sure you want to reset your game? All progress will be lost!</p>
+            <div class="flex justify-end gap-2">
+                <button id="confirm-reset-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    Reset Game
+                </button>
+                <button id="cancel-reset-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-md transition-colors text-sm">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game version
+        const GAME_VERSION = "1.1.0";
+        
+        // Initialize game state
+        const game = {
+            version: GAME_VERSION,
+            grass: 0,
+            totalGrass: 0,
+            grassSpent: 0,
+            cuttingPower: 1,
+            cuttingLevel: 1,
+            cuttingCost: 10,
+            maxStamina: 100,
+            stamina: 100,
+            staminaLevel: 1,
+            staminaCost: 15,
+            staminaRegen: 1,
+            staminaRegenLevel: 1,
+            staminaRegenCost: 20,
+            day: 1,
+            isDay: true,
+            isSleeping: false,
+            isResting: false,
+            restTime: 5, // seconds to rest when out of stamina
+            weather: "sunny", // sunny, rainy, windy
+            weatherForecastUnlocked: false,
+            nextWeather: "sunny",
+            luckLevel: 0,
+            luckCost: 50,
+            sleepLevel: 1,
+            sleepCost: 40,
+            totalCuts: 0,
+            sessionGrass: 0,
+            weatherChanges: 0,
+            startTime: Date.now(),
+            sessionStartTime: Date.now(),
+            tools: [
+                { id: "scissors", name: "Basic Scissors", icon: "✂️", power: 1, basePower: 1, owned: true, selected: true },
+                { id: "shears", name: "Garden Shears", icon: "🗡️", power: 3, basePower: 3, cost: 150, owned: false, selected: false },
+                { id: "mower", name: "Lawn Mower", icon: "🚜", power: 10, basePower: 10, cost: 500, owned: false, selected: false },
+                { id: "scythe", name: "Magic Scythe", icon: "⚔️", power: 25, basePower: 25, cost: 2000, owned: false, selected: false }
+            ],
+            furniture: {
+                plant: false,
+                bed: false,
+                chair: false
+            },
+            helpers: {
+                count: 0,
+                power: 1,
+                powerLevel: 1,
+                powerCost: 50,
+                speed: 5, // seconds between cuts
+                speedLevel: 1,
+                speedCost: 75,
+                baseCost: 100  // Base cost for the first helper
+            },
+            specialAutomation: {
+                rainCollector: false,
+                nightWorker: false
+            },
+            comfortLevel: "Basic",
+            achievements: [
+                { id: "first-cut", name: "First Cut", description: "Cut grass for the first time", condition: () => game.totalCuts > 0, unlocked: false, icon: "✂️" },
+                { id: "grass-collector", name: "Grass Collector", description: "Collect 100 grass total", condition: () => game.totalGrass >= 100, unlocked: false, icon: "🌿" },
+                { id: "grass-hoarder", name: "Grass Hoarder", description: "Collect 1,000 grass total", condition: () => game.totalGrass >= 1000, unlocked: false, icon: "🌿" },
+                { id: "grass-tycoon", name: "Grass Tycoon", description: "Collect 10,000 grass total", condition: () => game.totalGrass >= 10000, unlocked: false, icon: "💰" },
+                { id: "first-upgrade", name: "Upgrade Enthusiast", description: "Purchase your first upgrade", condition: () => game.cuttingLevel > 1 || game.staminaLevel > 1, unlocked: false, icon: "📈" },
+                { id: "first-furniture", name: "Home Decorator", description: "Buy your first piece of furniture", condition: () => game.furniture.plant || game.furniture.bed || game.furniture.chair, unlocked: false, icon: "🪑" },
+                { id: "first-helper", name: "Employer", description: "Hire your first helper frog", condition: () => game.helpers.count > 0, unlocked: false, icon: "🐸" },
+                { id: "first-tool", name: "Tool Collector", description: "Buy a new cutting tool", condition: () => game.tools.filter(t => t.owned).length > 1, unlocked: false, icon: "🛠️" },
+                { id: "weatherman", name: "Weatherman", description: "Unlock weather forecasting", condition: () => game.weatherForecastUnlocked, unlocked: false, icon: "🌦️" },
+                { id: "automation-master", name: "Automation Master", description: "Hire 5 helper frogs", condition: () => game.helpers.count >= 5, unlocked: false, icon: "⚙️" },
+                { id: "comfort-king", name: "Comfort King", description: "Own all furniture pieces", condition: () => game.furniture.plant && game.furniture.bed && game.furniture.chair, unlocked: false, icon: "👑" },
+                { id: "dedicated", name: "Dedicated", description: "Play for 30 minutes", condition: () => (Date.now() - game.startTime) >= 30 * 60 * 1000, unlocked: false, icon: "⏱️" }
+            ]
+        };
+        
+        // Default game state for resets
+        const defaultGameState = JSON.parse(JSON.stringify(game));
+
+        // DOM elements
+        const elements = {
+            grassCount: document.getElementById('grass-count'),
+            grassPerSecond: document.getElementById('grass-per-second'),
+            staminaBar: document.getElementById('stamina-bar'),
+            staminaText: document.getElementById('stamina-text'),
+            cuttingPower: document.getElementById('cutting-power'),
+            cuttingCost: document.getElementById('cutting-cost'),
+            cuttingLevel: document.getElementById('cutting-level'),
+            staminaCost: document.getElementById('stamina-cost'),
+            staminaLevel: document.getElementById('stamina-level'),
+            regenCost: document.getElementById('regen-cost'),
+            regenLevel: document.getElementById('regen-level'),
+            luckCost: document.getElementById('luck-cost'),
+            luckLevel: document.getElementById('luck-level'),
+            sleepCost: document.getElementById('sleep-cost'),
+            sleepLevel: document.getElementById('sleep-level'),
+            timeDisplay: document.getElementById('time-display'),
+            weatherDisplay: document.getElementById('weather-display'),
+            weatherForecastStatus: document.getElementById('weather-forecast-status'),
+            toolIcon: document.getElementById('tool-icon'),
+            toolName: document.getElementById('tool-name'),
+            cutGrassBtn: document.getElementById('cut-grass-btn'),
+            upgradeCuttingBtn: document.getElementById('upgrade-cutting'),
+            upgradeStaminaBtn: document.getElementById('upgrade-stamina'),
+            upgradeRegenBtn: document.getElementById('upgrade-regen'),
+            upgradeLuckBtn: document.getElementById('upgrade-luck'),
+            upgradeSleepBtn: document.getElementById('upgrade-sleep'),
+            upgradeWeatherBtn: document.getElementById('upgrade-weather'),
+            toolsShop: document.getElementById('tools-shop'),
+            buyPlantBtn: document.getElementById('buy-plant'),
+            buyBedBtn: document.getElementById('buy-bed'),
+            buyChairBtn: document.getElementById('buy-chair'),
+            buyHelperBtn: document.getElementById('buy-helper'),
+            upgradeHelperPowerBtn: document.getElementById('upgrade-helper-power'),
+            upgradeHelperSpeedBtn: document.getElementById('upgrade-helper-speed'),
+            buyRainCollectorBtn: document.getElementById('buy-rain-collector'),
+            buyNightWorkerBtn: document.getElementById('buy-night-worker'),
+            helperCount: document.getElementById('helper-count'),
+            helperPower: document.getElementById('helper-power'),
+            helperSpeed: document.getElementById('helper-speed'),
+            helperPowerCost: document.getElementById('helper-power-cost'),
+            helperPowerLevel: document.getElementById('helper-power-level'),
+            helperSpeedCost: document.getElementById('helper-speed-cost'),
+            helperSpeedLevel: document.getElementById('helper-speed-level'),
+            gameLog: document.getElementById('game-log'),
+            frog: document.getElementById('frog'),
+            sleepIndicator: document.getElementById('sleep-indicator'),
+            weatherContainer: document.getElementById('weather-container'),
+            helpersContainer: document.getElementById('helpers-container'),
+            comfortLevel: document.getElementById('comfort-level'),
+            furnitureDisplay: document.getElementById('furniture-display'),
+            achievementsContainer: document.getElementById('achievements-container'),
+            notification: document.getElementById('notification'),
+            manualRate: document.getElementById('manual-rate'),
+            autoRate: document.getElementById('auto-rate'),
+            manualBar: document.getElementById('manual-bar'),
+            autoBar: document.getElementById('auto-bar'),
+            saveGameBtn: document.getElementById('save-game-btn'),
+            resetGameBtn: document.getElementById('reset-game-btn'),
+            exportGameBtn: document.getElementById('export-game-btn'),
+            importGameBtn: document.getElementById('import-game-btn'),
+            supportBtn: document.getElementById('support-btn'),
+            exportModal: document.getElementById('export-modal'),
+            importModal: document.getElementById('import-modal'),
+            supportModal: document.getElementById('support-modal'),
+            resetModal: document.getElementById('reset-modal'),
+            exportData: document.getElementById('export-data'),
+            importData: document.getElementById('import-data'),
+            copyExportBtn: document.getElementById('copy-export-btn'),
+            importBtn: document.getElementById('import-btn'),
+            confirmResetBtn: document.getElementById('confirm-reset-btn'),
+            cancelResetBtn: document.getElementById('cancel-reset-btn'),
+            closeModalBtns: document.querySelectorAll('.close-modal'),
+            gameVersionDisplay: document.getElementById('stat-game-version'),
+            // Stats elements
+            statTotalGrass: document.getElementById('stat-total-grass'),
+            statTimePlayed: document.getElementById('stat-time-played'),
+            statTotalCuts: document.getElementById('stat-total-cuts'),
+            statDaysPassed: document.getElementById('stat-days-passed'),
+            statGrassSpent: document.getElementById('stat-grass-spent'),
+            statAchievements: document.getElementById('stat-achievements'),
+            statSessionTime: document.getElementById('stat-session-time'),
+            statSessionGrass: document.getElementById('stat-session-grass'),
+            statGrassPerMin: document.getElementById('stat-grass-per-min'),
+            statWeatherChanges: document.getElementById('stat-weather-changes'),
+            statCurrentProduction: document.getElementById('stat-current-production'),
+        };
+
+        // Tab navigation
+        const tabLinks = document.querySelectorAll('.tab-link');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Remove active class from all tabs
+                tabLinks.forEach(t => t.classList.remove('active', 'border-primary'));
+                tabLinks.forEach(t => t.classList.add('border-transparent'));
+                
+                // Add active class to clicked tab
+                link.classList.add('active', 'border-primary');
+                link.classList.remove('border-transparent');
+                
+                // Hide all tab contents
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                // Show corresponding tab content
+                const tabId = link.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+        
+        // Modal handling
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('active');
+            }
+        }
+        
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+        
+        // Function to encode a string to Base64 with UTF-8 support
+        function encodeBase64(str) {
+            try {
+                return btoa(unescape(encodeURIComponent(str)));
+            } catch (error) {
+                console.error("Error encoding to base64:", error);
+                return "";
+            }
+        }
+        
+        // Function to decode a Base64 string with UTF-8 support
+        function decodeBase64(str) {
+            try {
+                return decodeURIComponent(escape(atob(str)));
+            } catch (error) {
+                console.error("Error decoding from base64:", error);
+                return "";
+            }
+        }
+
+        
+        // Export/Import functionality
+        elements.exportGameBtn.addEventListener('click', () => {
+            try {
+                // Create a clean save object
+                const saveData = {
+                    version: GAME_VERSION,
+                    timestamp: Date.now(),
+                    gameState: {}
+                };
+                
+                // Copy all important game state properties (exclude achievements and functions)
+                for (const [key, value] of Object.entries(game)) {
+                    if (key !== 'achievements') {
+                        if (typeof value !== 'function') {
+                            saveData.gameState[key] = JSON.parse(JSON.stringify(value));
+                        }
+                    }
+                }
+                
+                // Convert to JSON string
+                const jsonString = JSON.stringify(saveData);
+                
+                // Encode to Base64
+                const base64String = encodeBase64(jsonString);
+                
+                // Update the textarea and open the modal
+                elements.exportData.value = base64String;
+                openModal('export-modal');
+            } catch (error) {
+                console.error("Export error:", error);
+                showNotification("Error generating export data!");
+            }
+        });
+        
+        elements.copyExportBtn.addEventListener('click', () => {
+            // Copy the save data to clipboard
+            elements.exportData.select();
+            document.execCommand('copy');
+            showNotification("Save data copied to clipboard!");
+        });
+        
+        elements.importGameBtn.addEventListener('click', () => {
+            elements.importData.value = "";
+            openModal('import-modal');
+        });
+        
+        elements.importBtn.addEventListener('click', () => {
+            const importCode = elements.importData.value.trim();
+            if (!importCode) {
+                showNotification("No save data provided!");
+                return;
+            }
+
+            try {
+                // Decode Base64 string
+                const jsonString = decodeBase64(importCode);
+                
+                if (!jsonString) {
+                    throw new Error("Failed to decode save data");
+                }
+                
+                const saveData = JSON.parse(jsonString);
+                
+                // Validate save data
+                if (!saveData.version || !saveData.gameState) {
+                    throw new Error("Invalid save data format");
+                }
+                
+                // Log the imported data for debugging
+                console.log("Imported data:", JSON.stringify(saveData));
+                
+                // Reset current state to default before importing
+                resetGameState();
+                
+                // Apply imported state
+                for (const [key, value] of Object.entries(saveData.gameState)) {
+                    if (key !== 'achievements') {
+                        game[key] = value;
+                    }
+                }
+                
+                // Set session-specific data
+                game.sessionStartTime = Date.now();
+                game.sessionGrass = 0;
+                
+                // Update UI with imported state
+                initializeGame();
+                
+                // Check achievements
+                checkAchievements();
+                
+                closeModal('import-modal');
+                showNotification("Game data imported successfully!");
+                addToLog("Game imported successfully! Welcome back!");
+            } catch (error) {
+                console.error("Import error:", error);
+                showNotification("Error importing save data: " + error.message);
+            }
+        });
+        
+        // Support button
+        elements.supportBtn.addEventListener('click', () => {
+            openModal('support-modal');
+        });
+        
+        // Reset Game
+        elements.resetGameBtn.addEventListener('click', () => {
+            openModal('reset-modal');
+        });
+        
+        // Confirm Reset
+        elements.confirmResetBtn.addEventListener('click', () => {
+            resetGameState();
+            localStorage.removeItem('frogGrassCutterSave');
+            
+            // Update UI with reset state
+            initializeGame();
+            showNotification("Game has been reset!");
+            addToLog("Game has been reset to default values!");
+            
+            closeModal('reset-modal');
+        });
+        
+        // Cancel Reset
+        elements.cancelResetBtn.addEventListener('click', () => {
+            closeModal('reset-modal');
+        });
+        
+        // Reset game state to default
+        function resetGameState() {
+            // Reset all game properties to default values
+            for (const [key, value] of Object.entries(defaultGameState)) {
+                if (key !== 'achievements') {
+                    game[key] = JSON.parse(JSON.stringify(value));
+                }
+            }
+            
+            // Reset achievements separately
+            game.achievements.forEach(achievement => {
+                achievement.unlocked = false;
+            });
+            
+            // Update timestamp
+            game.startTime = Date.now();
+            game.sessionStartTime = Date.now();
+        }
+        
+        // Close modal buttons
+        elements.closeModalBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const modal = btn.closest('.modal');
+                if (modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Initialize tools shop
+        function initializeToolsShop() {
+            elements.toolsShop.innerHTML = '';
+            
+            // Display all tools, not just the scissors and unowned ones
+            game.tools.forEach((tool, index) => {
+                const toolDiv = document.createElement('div');
+                toolDiv.className = 'flex justify-between items-center';
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.innerHTML = `
+                    <p>${tool.icon} ${tool.name}</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Power: ${tool.power} grass/cut</p>
+                `;
+                
+                const button = document.createElement('button');
+                if (tool.owned) {
+                    if (tool.selected) {
+                        button.textContent = 'Equipped';
+                        button.className = 'bg-green-500 text-white text-sm py-1 px-3 rounded-md opacity-50 cursor-not-allowed';
+                    } else {
+                        button.textContent = 'Equip';
+                        button.className = 'bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors';
+                        button.addEventListener('click', () => equipTool(tool.id));
+                    }
+                } else {
+                    button.textContent = `Buy (${tool.cost} 🌿)`;
+                    button.className = 'bg-primary hover:bg-purple-600 text-white text-sm py-1 px-3 rounded-md transition-colors';
+                    button.addEventListener('click', () => buyTool(tool.id));
+                    
+                    if (game.grass < tool.cost) {
+                        button.classList.add('opacity-50', 'cursor-not-allowed');
+                        button.classList.remove('hover:bg-purple-600');
+                    } else {
+                        button.classList.remove('opacity-50', 'cursor-not-allowed');
+                        button.classList.add('hover:bg-purple-600');
+                    }
+                }
+                
+                toolDiv.appendChild(infoDiv);
+                toolDiv.appendChild(button);
+                elements.toolsShop.appendChild(toolDiv);
+                
+                // Add divider between tools
+                if (index < game.tools.length - 1) {
+                    const divider = document.createElement('hr');
+                    divider.className = 'my-2 border-gray-200 dark:border-gray-700';
+                    elements.toolsShop.appendChild(divider);
+                }
+            });
+        }
+
+        // Function to calculate helper cost based on how many helpers the player has
+        function calculateHelperCost() {
+            return Math.floor(game.helpers.baseCost * Math.pow(1.5, game.helpers.count));
+        }
+
+        // Update the UI to match the game state
+        function updateUI() {
+            elements.grassCount.textContent = Math.floor(game.grass);
+            elements.staminaBar.style.width = `${(game.stamina / game.maxStamina) * 100}%`;
+            elements.staminaText.textContent = `${Math.floor(game.stamina)}/${game.maxStamina}`;
+            elements.cuttingPower.textContent = getSelectedTool().power;
+            elements.cuttingCost.textContent = game.cuttingCost;
+            elements.cuttingLevel.textContent = game.cuttingLevel;
+            elements.staminaCost.textContent = game.staminaCost;
+            elements.staminaLevel.textContent = game.staminaLevel;
+            elements.regenCost.textContent = game.staminaRegenCost;
+            elements.regenLevel.textContent = game.staminaRegenLevel;
+            elements.luckCost.textContent = game.luckCost;
+            elements.luckLevel.textContent = game.luckLevel;
+            elements.sleepCost.textContent = game.sleepCost;
+            elements.sleepLevel.textContent = game.sleepLevel;
+            elements.weatherForecastStatus.textContent = game.weatherForecastUnlocked ? "Unlocked" : "Locked";
+            elements.gameVersionDisplay.textContent = game.version || GAME_VERSION;
+            // Update helper cost display
+            const nextHelperCost = calculateHelperCost();
+            elements.buyHelperBtn.textContent = `Hire (${nextHelperCost} 🌿)`;
+  
+            // Update cut grass button state
+    if (game.isSleeping || !game.isDay) {
+        elements.cutGrassBtn.textContent = "Sleeping...";
+        elements.cutGrassBtn.disabled = true;
+        elements.cutGrassBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        elements.cutGrassBtn.classList.remove('hover:bg-purple-600');
+    } else if (game.isResting) {
+        elements.cutGrassBtn.textContent = "Resting...";
+        elements.cutGrassBtn.disabled = true;
+        elements.cutGrassBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        elements.cutGrassBtn.classList.remove('hover:bg-purple-600');
+    } else {
+        elements.cutGrassBtn.textContent = "Cut Grass";
+        elements.cutGrassBtn.disabled = false;
+        elements.cutGrassBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        elements.cutGrassBtn.classList.add('hover:bg-purple-600');
+    }
+            
+            // Helper stats
+            elements.helperCount.textContent = game.helpers.count;
+            elements.helperPower.textContent = game.helpers.power;
+            elements.helperSpeed.textContent = game.helpers.speed;
+            elements.helperPowerCost.textContent = game.helpers.powerCost;
+            elements.helperPowerLevel.textContent = game.helpers.powerLevel;
+            elements.helperSpeedCost.textContent = game.helpers.speedCost;
+            elements.helperSpeedLevel.textContent = game.helpers.speedLevel;
+            
+            // Tool display
+            const selectedTool = getSelectedTool();
+            elements.toolIcon.textContent = selectedTool.icon;
+            elements.toolName.textContent = selectedTool.name;
+            
+            // Update auto production rate
+            const autoRate = calculateAutoProductionRate();
+            if (autoRate > 0) {
+                elements.grassPerSecond.textContent = `(+${autoRate.toFixed(1)}/sec)`;
+            } else {
+                elements.grassPerSecond.textContent = '';
+            }
+            
+            // Update production stats
+            elements.manualRate.textContent = getSelectedTool().power;
+            elements.autoRate.textContent = autoRate.toFixed(1);
+            
+            // Update production bars
+            const totalProduction = getSelectedTool().power + (autoRate * 5); // Roughly compare manual vs auto
+            const manualPercent = (getSelectedTool().power / totalProduction) * 100;
+            const autoPercent = (autoRate * 5 / totalProduction) * 100;
+            
+            elements.manualBar.style.width = `${manualPercent}%`;
+            elements.autoBar.style.width = `${autoPercent}%`;
+            
+            // Button states based on resources
+            updateButtonStates();
+            
+            // Update furniture display
+            updateFurnitureDisplay();
+            
+            // Hide bought furniture
+            if (game.furniture.plant) {
+                document.querySelector('#buy-plant').parentElement.classList.add('opacity-50');
+                document.querySelector('#buy-plant').textContent = "Owned";
+            } else {
+                document.querySelector('#buy-plant').parentElement.classList.remove('opacity-50');
+                document.querySelector('#buy-plant').textContent = "Buy (100 🌿)";
+            }
+            
+            if (game.furniture.bed) {
+                document.querySelector('#buy-bed').parentElement.classList.add('opacity-50');
+                document.querySelector('#buy-bed').textContent = "Owned";
+            } else {
+                document.querySelector('#buy-bed').parentElement.classList.remove('opacity-50');
+                document.querySelector('#buy-bed').textContent = "Buy (250 🌿)";
+            }
+            
+            if (game.furniture.chair) {
+                document.querySelector('#buy-chair').parentElement.classList.add('opacity-50');
+                document.querySelector('#buy-chair').textContent = "Owned";
+            } else {
+                document.querySelector('#buy-chair').parentElement.classList.remove('opacity-50');
+                document.querySelector('#buy-chair').textContent = "Buy (500 🌿)";
+            }
+            
+            // Update automation features
+            if (game.specialAutomation.rainCollector) {
+                document.querySelector('#buy-rain-collector').parentElement.classList.add('opacity-50');
+                document.querySelector('#buy-rain-collector').textContent = "Owned";
+            } else {
+                document.querySelector('#buy-rain-collector').parentElement.classList.remove('opacity-50');
+                document.querySelector('#buy-rain-collector').textContent = "Buy (200 🌿)";
+            }
+            
+            if (game.specialAutomation.nightWorker) {
+                document.querySelector('#buy-night-worker').parentElement.classList.add('opacity-50');
+                document.querySelector('#buy-night-worker').textContent = "Owned";
+            } else {
+                document.querySelector('#buy-night-worker').parentElement.classList.remove('opacity-50');
+                document.querySelector('#buy-night-worker').textContent = "Buy (300 🌿)";
+            }
+            
+            // Update cut grass button state
+            if (game.isSleeping) {
+                elements.cutGrassBtn.textContent = "Sleeping...";
+                elements.cutGrassBtn.disabled = true;
+                elements.cutGrassBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                elements.cutGrassBtn.classList.remove('hover:bg-purple-600');
+            } else if (game.isResting) {
+                elements.cutGrassBtn.textContent = "Resting...";
+                elements.cutGrassBtn.disabled = true;
+                elements.cutGrassBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                elements.cutGrassBtn.classList.remove('hover:bg-purple-600');
+            } else {
+                elements.cutGrassBtn.textContent = "Cut Grass";
+                elements.cutGrassBtn.disabled = false;
+                elements.cutGrassBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                elements.cutGrassBtn.classList.add('hover:bg-purple-600');
+            }
+            
+            // Update frog animation state
+            if (game.isSleeping) {
+                elements.frog.classList.remove('animate-cutting');
+                elements.frog.classList.add('animate-sleeping');
+                elements.sleepIndicator.classList.remove('hidden');
+            } else if (game.isResting) {
+                elements.frog.classList.remove('animate-cutting', 'animate-sleeping');
+                elements.sleepIndicator.classList.add('hidden');
+            } else {
+                elements.frog.classList.remove('animate-sleeping');
+                elements.sleepIndicator.classList.add('hidden');
+            }
+            
+            // Update weather display
+            updateWeatherDisplay();
+            
+            // Update stats display
+            updateStats();
+        }
+        
+        // Update button states
+        function updateButtonStates() {
+            // Button states based on resources
+            if (elements.upgradeCuttingBtn) {
+                elements.upgradeCuttingBtn.disabled = game.grass < game.cuttingCost;
+                if (elements.upgradeCuttingBtn.disabled) {
+                    elements.upgradeCuttingBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    elements.upgradeCuttingBtn.classList.remove('hover:bg-purple-600');
+                } else {
+                    elements.upgradeCuttingBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    elements.upgradeCuttingBtn.classList.add('hover:bg-purple-600');
+                }
+            }
+
+             // Disable cut grass button during nighttime
+    if (!game.isDay) {
+        elements.cutGrassBtn.disabled = true;
+        elements.cutGrassBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        elements.cutGrassBtn.classList.remove('hover:bg-purple-600');
+    }
+            
+            const buttonConfigs = [
+                { el: elements.upgradeStaminaBtn, cost: game.staminaCost },
+                { el: elements.upgradeRegenBtn, cost: game.staminaRegenCost },
+                { el: elements.upgradeLuckBtn, cost: game.luckCost },
+                { el: elements.upgradeSleepBtn, cost: game.sleepCost },
+                { el: elements.upgradeWeatherBtn, cost: 100, condition: !game.weatherForecastUnlocked },
+                { el: elements.buyPlantBtn, cost: 100, condition: !game.furniture.plant },
+                { el: elements.buyBedBtn, cost: 250, condition: !game.furniture.bed },
+                { el: elements.buyChairBtn, cost: 500, condition: !game.furniture.chair },
+                { el: elements.buyHelperBtn, cost: 100 },
+                { el: elements.upgradeHelperPowerBtn, cost: game.helpers.powerCost, condition: game.helpers.count > 0 },
+                { el: elements.upgradeHelperSpeedBtn, cost: game.helpers.speedCost, condition: game.helpers.count > 0 },
+                { el: elements.buyRainCollectorBtn, cost: 200, condition: !game.specialAutomation.rainCollector },
+                { el: elements.buyNightWorkerBtn, cost: 300, condition: !game.specialAutomation.nightWorker }
+            ];
+            
+            buttonConfigs.forEach(config => {
+                if (config.el) {
+                    const canAfford = game.grass >= config.cost;
+                    const enabled = canAfford && (config.condition === undefined || config.condition);
+                    
+                    config.el.disabled = !enabled;
+                    
+                    if (!enabled) {
+                        config.el.classList.add('opacity-50', 'cursor-not-allowed');
+                        config.el.classList.remove('hover:bg-purple-600');
+                    } else {
+                        config.el.classList.remove('opacity-50', 'cursor-not-allowed');
+                        config.el.classList.add('hover:bg-purple-600');
+                    }
+                }
+            });
+            
+            // Also update the tool shop buttons
+            initializeToolsShop();
+        }
+        
+        // Get the currently selected tool
+        function getSelectedTool() {
+            return game.tools.find(tool => tool.selected) || game.tools[0];
+        }
+        
+        // Calculate auto production rate (grass per second)
+        function calculateAutoProductionRate() {
+            if (game.helpers.count === 0) return 0;
+            
+            let rate = (game.helpers.count * game.helpers.power) / game.helpers.speed;
+            
+            // If it's night and no night worker, no production
+            if (!game.isDay && !game.specialAutomation.nightWorker) {
+                rate = 0;
+            }
+            
+            // If rainy and has rain collector, bonus production
+            if (game.weather === "rainy" && game.specialAutomation.rainCollector) {
+                rate *= 1.5;
+            }
+            
+            return rate;
+        }
+        
+        // Add message to game log
+        function addToLog(message) {
+    const logEntry = document.createElement('p');
+    logEntry.textContent = message;
+    elements.gameLog.prepend(logEntry); // Prepends to the top
+
+    // Limit log to 50 entries
+    if (elements.gameLog.children.length > 50) {
+        elements.gameLog.removeChild(elements.gameLog.lastChild); // Remove the oldest entry
+    }
+
+    elements.gameLog.scrollTop = 0; // Scrolls to the top
+}
+        
+        // Update furniture display
+        function updateFurnitureDisplay() {
+            elements.furnitureDisplay.innerHTML = '';
+            
+            if (game.furniture.plant) {
+                const plant = document.createElement('span');
+                plant.textContent = '🌱';
+                plant.classList.add('text-xl');
+                elements.furnitureDisplay.appendChild(plant);
+            }
+            
+            if (game.furniture.bed) {
+                const bed = document.createElement('span');
+                bed.textContent = '🛌';
+                bed.classList.add('text-xl');
+                elements.furnitureDisplay.appendChild(bed);
+            }
+            
+            if (game.furniture.chair) {
+                const chair = document.createElement('span');
+                chair.textContent = '🪑';
+                chair.classList.add('text-xl');
+                elements.furnitureDisplay.appendChild(chair);
+            }
+            
+            // Update comfort level
+            const furnitureCount = Object.values(game.furniture).filter(Boolean).length;
+            if (furnitureCount === 0) {
+                game.comfortLevel = "Basic";
+            } else if (furnitureCount === 1) {
+                game.comfortLevel = "Cozy";
+            } else if (furnitureCount === 2) {
+                game.comfortLevel = "Comfortable";
+            } else {
+                game.comfortLevel = "Luxurious";
+            }
+            
+            elements.comfortLevel.textContent = game.comfortLevel;
+        }
+
+        // Update weather display
+        function updateWeatherDisplay() {
+            const weatherIcons = {
+                'sunny': '☀️ Sunny',
+                'rainy': '🌧️ Rainy',
+                'windy': '💨 Windy'
+            };
+            
+            elements.weatherDisplay.textContent = weatherIcons[game.weather] || weatherIcons.sunny;
+            
+            // Update weather visual effects
+            elements.weatherContainer.innerHTML = '';
+            
+            if (game.weather === 'rainy') {
+                // Add rain drops
+                for (let i = 0; i < 20; i++) {
+                    const drop = document.createElement('div');
+                    drop.className = 'rain-drop animate-rain';
+                    drop.style.left = `${Math.random() * 100}%`;
+                    drop.style.animationDelay = `${Math.random() * 1}s`;
+                    drop.style.animationDuration = `${0.5 + Math.random()}s`;
+                    elements.weatherContainer.appendChild(drop);
+                }
+            } else if (game.weather === 'sunny') {
+                // Add sun effect
+                const sun = document.createElement('div');
+                sun.className = 'sun-ray';
+                elements.weatherContainer.appendChild(sun);
+            } else if (game.weather === 'windy') {
+                // Add wind effect - floating leaves
+                for (let i = 0; i < 5; i++) {
+                    const leaf = document.createElement('div');
+                    leaf.textContent = '🍃';
+                    leaf.style.position = 'absolute';
+                    leaf.style.fontSize = '12px';
+                    leaf.style.opacity = '0.7';
+                    leaf.style.left = `${Math.random() * 100}%`;
+                    leaf.style.top = `${Math.random() * 100}%`;
+                    leaf.style.animation = `helper-move ${2 + Math.random() * 2}s infinite alternate`;
+                    leaf.style.animationDelay = `${Math.random() * 2}s`;
+                    elements.weatherContainer.appendChild(leaf);
+                }
+            }
+            
+            // If weather forecast is unlocked, show next day's weather
+            if (game.weatherForecastUnlocked) {
+                const forecastDiv = document.createElement('div');
+                forecastDiv.className = 'absolute bottom-2 right-2 text-xs bg-white dark:bg-gray-800 rounded-md px-1 py-0.5 opacity-80';
+                const nextWeatherIcon = weatherIcons[game.nextWeather].split(' ')[0];
+                forecastDiv.textContent = `Tomorrow: ${nextWeatherIcon}`;
+                elements.weatherContainer.appendChild(forecastDiv);
+            }
+        }
+        
+        // Update helper frogs
+        function updateHelperDisplay() {
+            elements.helpersContainer.innerHTML = '';
+            
+            // If night and no night worker, don't show helpers
+            if (!game.isDay && !game.specialAutomation.nightWorker) {
+                return;
+            }
+            
+            // Display up to 5 helper frogs visually (no matter how many we have)
+            const displayCount = Math.min(game.helpers.count, 5);
+            
+            for (let i = 0; i < displayCount; i++) {
+                const helper = document.createElement('div');
+                helper.textContent = '🐸';
+                helper.style.position = 'absolute';
+                helper.style.fontSize = '16px';
+                helper.style.opacity = '0.8';
+                
+                // Position randomly within the container
+                helper.style.left = `${10 + (i * 15)}%`;
+                helper.style.top = `${50 + (Math.random() * 30)}%`;
+                
+                // Add animation
+                helper.classList.add('animate-helper-move');
+                helper.style.animationDelay = `${i * 0.2}s`;
+                
+                elements.helpersContainer.appendChild(helper);
+            }
+            
+            // If we have more than 5, show a count
+            if (game.helpers.count > 5) {
+                const counter = document.createElement('div');
+                counter.className = 'absolute bottom-2 left-2 text-xs bg-white dark:bg-gray-800 rounded-full px-2 py-1 opacity-80';
+                counter.textContent = `+${game.helpers.count - 5} more`;
+                elements.helpersContainer.appendChild(counter);
+            }
+        }
+        
+        // Initialize achievements
+        function initializeAchievements() {
+            elements.achievementsContainer.innerHTML = '';
+            
+            game.achievements.forEach(achievement => {
+                const achievementDiv = document.createElement('div');
+                achievementDiv.className = `achievement p-3 border dark:border-gray-700 rounded-lg mb-2 ${achievement.unlocked ? 'unlocked' : 'locked'}`;
+                achievementDiv.setAttribute('data-id', achievement.id);
+                
+                achievementDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-2">${achievement.icon}</span>
+                        <div>
+                            <h3 class="font-bold">${achievement.name}</h3>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">${achievement.description}</p>
+                        </div>
+                        <div class="ml-auto">
+                            <span class="text-sm ${achievement.unlocked ? 'text-green-500' : 'text-gray-400'}">
+                                ${achievement.unlocked ? '✓' : '○'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+                
+                elements.achievementsContainer.appendChild(achievementDiv);
+            });
+            
+            // Update achievement count
+            const unlockedCount = game.achievements.filter(a => a.unlocked).length;
+            elements.statAchievements.textContent = `${unlockedCount}/${game.achievements.length}`;
+        }
+        
+        // Check for achievements
+        function checkAchievements() {
+            let newAchievements = 0;
+            
+            game.achievements.forEach(achievement => {
+                if (!achievement.unlocked && achievement.condition()) {
+                    achievement.unlocked = true;
+                    newAchievements++;
+                    
+                    // Update achievement display
+                    const achievementDiv = document.querySelector(`.achievement[data-id="${achievement.id}"]`);
+                    if (achievementDiv) {
+                        achievementDiv.classList.remove('locked');
+                        achievementDiv.classList.add('unlocked');
+                        achievementDiv.querySelector('span:last-child').className = 'text-sm text-green-500';
+                        achievementDiv.querySelector('span:last-child').textContent = '✓';
+                    }
+                    
+                    // Show notification
+                    showNotification(`🏆 Achievement unlocked: ${achievement.name}!`);
+                    
+                    // Log achievement
+                    addToLog(`Achievement unlocked: ${achievement.name}!`);
+                }
+            });
+            
+            if (newAchievements > 0) {
+                // Update achievement count
+                const unlockedCount = game.achievements.filter(a => a.unlocked).length;
+                elements.statAchievements.textContent = `${unlockedCount}/${game.achievements.length}`;
+            }
+        }
+        
+        // Show notification
+        function showNotification(message) {
+            elements.notification.textContent = message;
+            elements.notification.classList.add('show-notification');
+            
+            setTimeout(() => {
+                elements.notification.classList.remove('show-notification');
+            }, 3000);
+        }
+        
+        // Update stats
+        function updateStats() {
+            const currentTime = Date.now();
+            const timePlayed = Math.floor((currentTime - game.startTime) / (1000 * 60)); // In minutes
+            const sessionTime = Math.floor((currentTime - game.sessionStartTime) / (1000 * 60)); // In minutes
+            
+            elements.statTotalGrass.textContent = Math.floor(game.totalGrass);
+            elements.statTimePlayed.textContent = `${timePlayed} minute${timePlayed !== 1 ? 's' : ''}`;
+            elements.statTotalCuts.textContent = game.totalCuts;
+            elements.statDaysPassed.textContent = game.day;
+            elements.statGrassSpent.textContent = Math.floor(game.grassSpent);
+            
+            elements.statSessionTime.textContent = `${sessionTime} minute${sessionTime !== 1 ? 's' : ''}`;
+            elements.statSessionGrass.textContent = Math.floor(game.sessionGrass);
+            
+            // Calculate grass per minute
+            const grassPerMin = sessionTime > 0 ? Math.floor(game.sessionGrass / sessionTime) : 0;
+            elements.statGrassPerMin.textContent = grassPerMin;
+            
+            elements.statWeatherChanges.textContent = game.weatherChanges;
+            elements.statCurrentProduction.textContent = `${calculateAutoProductionRate().toFixed(1)} 🌿/sec`;
+        }
+        
+        // Day/Night cycle
+        function startDayNightCycle() {
+    // Each day/night cycle lasts 2 minutes (1 min day, 1 min night)
+    const dayLength = 60 * 1000; // 1 minute in milliseconds
+    const nightLength = 60 * 1000; // 1 minute in milliseconds
+    
+    // Ensure we start with day
+    game.isDay = true;
+    
+    // Function to handle day transition
+    function startDay() {
+        game.isDay = true;
+        game.day++;
+        
+        // Only switch to light mode during the day if the user isn't using system dark mode
+        if (!window.matchMedia || !window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.remove('dark');
+        }
+        elements.timeDisplay.textContent = `Day ${game.day} - 🌞 Daytime`;
+        game.isSleeping = false;
+        
+        // Change weather
+        game.weather = game.nextWeather;
+        game.weatherChanges++;
+        
+        // Determine next day's weather
+        const weatherChances = {
+            'sunny': 0.6,
+            'rainy': 0.3,
+            'windy': 0.1
+        };
+        
+        const roll = Math.random();
+        let cumulativeChance = 0;
+        
+        for (const [weather, chance] of Object.entries(weatherChances)) {
+            cumulativeChance += chance;
+            if (roll < cumulativeChance) {
+                game.nextWeather = weather;
+                break;
+            }
+        }
+        
+        // Morning stamina boost based on comfort level
+        let staminaBoost = 0;
+        const sleepMultiplier = 1 + (0.1 * (game.sleepLevel - 1));
+        
+        switch (game.comfortLevel) {
+            case "Cozy":
+                staminaBoost = 0.1 * game.maxStamina * sleepMultiplier;
+                break;
+            case "Comfortable":
+                staminaBoost = 0.2 * game.maxStamina * sleepMultiplier;
+                break;
+            case "Luxurious":
+                staminaBoost = 0.3 * game.maxStamina * sleepMultiplier;
+                break;
+        }
+        
+        if (staminaBoost > 0) {
+            game.stamina = Math.min(game.maxStamina, game.stamina + staminaBoost);
+            addToLog(`Day ${game.day}: Good morning! Your comfortable home gave you ${Math.floor(staminaBoost)} extra stamina.`);
+        } else {
+            addToLog(`Day ${game.day}: Good morning! Time to cut some grass.`);
+        }
+        
+        // Weather effect message
+        const weatherMessages = {
+            'sunny': `It's a beautiful sunny day. Perfect for cutting grass!`,
+            'rainy': `It's raining today. The grass looks greener and more plentiful.`,
+            'windy': `It's quite windy today. The grass is waving in the breeze.`
+        };
+        
+        addToLog(weatherMessages[game.weather]);
+        
+        updateUI();
+        updateHelperDisplay();
+        saveGame();
+        
+        // Schedule night after day duration
+        setTimeout(startNight, dayLength);
+    }
+    
+    // Function to handle night transition
+    function startNight() {
+        game.isDay = false;
+        document.documentElement.classList.add('dark');
+        elements.timeDisplay.textContent = `Day ${game.day} - 🌙 Nighttime`;
+        game.isSleeping = true;
+        addToLog(`Day ${game.day}: Night has fallen. Your frog is sleeping.`);
+        
+	// Night rest - recover some stamina
+	const sleepMultiplier = 1 + (0.1 * Math.sqrt(game.sleepLevel - 1));  // Diminishing returns
+	const recoveryPercentage = Math.min(0.85, 0.3 * sleepMultiplier);  // Cap at 85% recovery
+	const nightRecovery = Math.floor(game.maxStamina * recoveryPercentage);
+	game.stamina = Math.min(game.maxStamina, game.stamina + nightRecovery);
+        
+        updateUI();
+        updateHelperDisplay();
+        saveGame();
+        
+        // Schedule day after night duration
+        setTimeout(startDay, nightLength);
+    }
+    
+    // Start the cycle with day
+    startDay();
+}
+        
+        // Helper frogs automation
+        function startHelperAutomation() {
+            setInterval(() => {
+                // Only work if we have helpers and it's daytime or we have night workers
+                if (game.helpers.count > 0 && (game.isDay || game.specialAutomation.nightWorker)) {
+                    // Calculate production based on current conditions
+                    let grassProduced = game.helpers.count * game.helpers.power;
+                    
+                    // Rainy weather bonus with rain collector
+                    if (game.weather === "rainy" && game.specialAutomation.rainCollector) {
+                        grassProduced *= 1.5;
+                    }
+                    
+                    // Add grass
+                    game.grass += grassProduced;
+                    game.totalGrass += grassProduced;
+                    game.sessionGrass += grassProduced;
+                    
+                    updateUI();
+                }
+            }, game.helpers.speed * 1000);
+        }
+        
+        // Process a click on the "Cut Grass" button
+        function cutGrass() {
+            if (game.isDay && !game.isSleeping && !game.isResting && game.stamina > 0) {
+                // Start cutting animation
+                elements.frog.classList.add('animate-cutting');
+                
+                // Get selected tool power
+                const selectedTool = getSelectedTool();
+                
+                // Cut grass and reduce stamina
+                let grassCut = selectedTool.power;
+                
+                // Lucky clover chance for bonus grass
+                if (game.luckLevel > 0) {
+                    const luckChance = 0.05 * game.luckLevel; // 5% per level
+                    if (Math.random() < luckChance) {
+                        grassCut *= 2;
+                        addToLog("Lucky! You found twice as much grass! 🍀");
+                    }
+                }  else if (!game.isDay) {
+     			   addToLog("It's nighttime! Your frog is sleeping and can't cut grass.");
+        		   return;
+    		  }
+                
+                // Weather effects
+                if (game.weather === "rainy") {
+                    // Rainy weather gives 20% more grass
+                    grassCut *= 1.2;
+                } else if (game.weather === "windy") {
+                    // Windy weather gives random grass between 50% and 150%
+                    grassCut *= 0.5 + Math.random();
+                }
+                
+                game.grass += grassCut;
+                game.totalGrass += grassCut;
+                game.sessionGrass += grassCut;
+                game.totalCuts++;
+                game.stamina -= 5; // Each cut costs 5 stamina
+                
+                // Random messages for variety
+                const messages = [
+                    `Snip! Cut ${grassCut.toFixed(1)} grass.`,
+                    `Chop! Gathered ${grassCut.toFixed(1)} blades of grass.`,
+                    `Your frog cuts ${grassCut.toFixed(1)} grass with precision.`,
+                    `Another ${grassCut.toFixed(1)} grass added to your collection.`
+                ];
+                const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+                addToLog(randomMessage);
+                
+                // Check if out of stamina
+                if (game.stamina <= 0) {
+                    game.stamina = 0;
+                    game.isResting = true;
+                    elements.frog.classList.remove('animate-cutting');
+                    
+                    addToLog(`Your frog is tired and needs to rest for ${game.restTime} seconds.`);
+                    
+                    // Rest timer
+                    setTimeout(() => {
+                        game.isResting = false;
+                        game.stamina = Math.min(game.maxStamina, game.stamina + 20); // Recover some stamina after rest
+                        addToLog("Your frog feels refreshed after resting!");
+                        updateUI();
+                    }, game.restTime * 1000);
+                }
+                
+                // Stop cutting animation after a short delay
+                setTimeout(() => {
+                    if (!game.isResting && !game.isSleeping) {
+                        elements.frog.classList.remove('animate-cutting');
+                    }
+                }, 500);
+                
+                updateUI();
+                checkAchievements();
+            }
+        }
+        
+        // Cut grass action
+        elements.cutGrassBtn.addEventListener('click', () => {
+    if (game.isDay) {
+        cutGrass();
+    } else {
+        addToLog("It's nighttime! Your frog is sleeping and can't cut grass.");
+    }
+});
+        
+        // Upgrade cutting power
+        elements.upgradeCuttingBtn.addEventListener('click', () => {
+    if (game.grass >= game.cuttingCost) {
+        game.grass -= game.cuttingCost;
+        game.grassSpent += game.cuttingCost;
+        game.cuttingLevel++;
+        
+        // Increase power of ALL tools by 10%
+game.tools.forEach(tool => {
+    const basePower = tool.basePower || tool.power; // Store the base power if not already stored
+    tool.basePower = basePower; // Save the base power for future calculations
+    tool.power = Math.ceil(basePower * (1 + 0.1 * game.cuttingLevel)); // Increase by 10% per level, rounding up
+});
+        
+        game.cuttingCost = Math.floor(game.cuttingCost * 1.5); // Each upgrade gets more expensive
+        
+        addToLog(`Upgraded cutting power to level ${game.cuttingLevel}! All your tools now cut more grass.`);
+        updateUI();
+        checkAchievements();
+    }
+});
+        
+        // Upgrade stamina
+        elements.upgradeStaminaBtn.addEventListener('click', () => {
+            if (game.grass >= game.staminaCost) {
+                game.grass -= game.staminaCost;
+                game.grassSpent += game.staminaCost;
+                game.staminaLevel++;
+                const staminaIncrease = 25;
+                game.maxStamina += staminaIncrease;
+                game.stamina += staminaIncrease;
+                game.staminaCost = Math.floor(game.staminaCost * 1.5); // Each upgrade gets more expensive
+                
+                addToLog(`Upgraded stamina to level ${game.staminaLevel}! Maximum stamina increased by ${staminaIncrease}.`);
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Upgrade stamina regeneration
+        elements.upgradeRegenBtn.addEventListener('click', () => {
+            if (game.grass >= game.staminaRegenCost) {
+                game.grass -= game.staminaRegenCost;
+                game.grassSpent += game.staminaRegenCost;
+                game.staminaRegenLevel++;
+                game.staminaRegen += 0.5;
+                game.staminaRegenCost = Math.floor(game.staminaRegenCost * 1.5);
+                
+                addToLog(`Upgraded stamina regeneration to level ${game.staminaRegenLevel}! You now recover ${game.staminaRegen} stamina every 5 seconds.`);
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Upgrade luck
+        elements.upgradeLuckBtn.addEventListener('click', () => {
+            if (game.grass >= game.luckCost) {
+                game.grass -= game.luckCost;
+                game.grassSpent += game.luckCost;
+                game.luckLevel++;
+                game.luckCost = Math.floor(game.luckCost * 1.8);
+                
+                addToLog(`Upgraded luck to level ${game.luckLevel}! You now have a ${game.luckLevel * 5}% chance to find double grass.`);
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Upgrade sleep (up to 85%, with diminishing returns)
+        elements.upgradeSleepBtn.addEventListener('click', () => {
+            if (game.grass >= game.sleepCost) {
+                game.grass -= game.sleepCost;
+                game.grassSpent += game.sleepCost;
+                game.sleepLevel++;
+                game.sleepCost = Math.floor(game.sleepCost * 1.5);
+                
+                addToLog(`Upgraded sleep quality to level ${game.sleepLevel}! You now recover more stamina during night.`); 
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Unlock weather forecast
+        elements.upgradeWeatherBtn.addEventListener('click', () => {
+            if (game.grass >= 100 && !game.weatherForecastUnlocked) {
+                game.grass -= 100;
+                game.grassSpent += 100;
+                game.weatherForecastUnlocked = true;
+                
+                addToLog("You've unlocked weather forecasting! Now you can see tomorrow's weather.");
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Buy furniture - Plant
+        elements.buyPlantBtn.addEventListener('click', () => {
+            if (game.grass >= 100 && !game.furniture.plant) {
+                game.grass -= 100;
+                game.grassSpent += 100;
+                game.furniture.plant = true;
+                addToLog("You bought a small plant! Your home looks nicer now.");
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Buy furniture - Bed
+        elements.buyBedBtn.addEventListener('click', () => {
+            if (game.grass >= 250 && !game.furniture.bed) {
+                game.grass -= 250;
+                game.grassSpent += 250;
+                game.furniture.bed = true;
+                addToLog("You bought a lily pad bed! Your frog will sleep better now.");
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Buy furniture - Chair
+        elements.buyChairBtn.addEventListener('click', () => {
+            if (game.grass >= 500 && !game.furniture.chair) {
+                game.grass -= 500;
+                game.grassSpent += 500;
+                game.furniture.chair = true;
+                addToLog("You bought a toadstool chair! Your home is getting quite fancy.");
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Buy helper frog
+        elements.buyHelperBtn.addEventListener('click', () => {
+            const helperCost = calculateHelperCost();
+            if (game.grass >= helperCost) {
+                game.grass -= helperCost;
+                game.grassSpent += helperCost;
+                game.helpers.count++;
+                
+                addToLog(`You hired a helper frog! You now have ${game.helpers.count} helper${game.helpers.count > 1 ? 's' : ''}.`);
+                updateUI();
+                updateHelperDisplay();
+                checkAchievements();
+            }
+        });
+        
+        // Upgrade helper power
+        elements.upgradeHelperPowerBtn.addEventListener('click', () => {
+            if (game.grass >= game.helpers.powerCost && game.helpers.count > 0) {
+                game.grass -= game.helpers.powerCost;
+                game.grassSpent += game.helpers.powerCost;
+                game.helpers.powerLevel++;
+                game.helpers.power++;
+                game.helpers.powerCost = Math.floor(game.helpers.powerCost * 1.6);
+                
+                addToLog(`Upgraded helper efficiency to level ${game.helpers.powerLevel}! Helpers now cut ${game.helpers.power} grass per action.`);
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Upgrade helper speed
+        elements.upgradeHelperSpeedBtn.addEventListener('click', () => {
+            if (game.grass >= game.helpers.speedCost && game.helpers.count > 0) {
+                game.grass -= game.helpers.speedCost;
+                game.grassSpent += game.helpers.speedCost;
+                game.helpers.speedLevel++;
+                game.helpers.speed = Math.max(1, Math.floor(game.helpers.speed * 0.8)); // Speed up (reduce time between cuts)
+                game.helpers.speedCost = Math.floor(game.helpers.speedCost * 1.7);
+                
+                addToLog(`Upgraded helper speed to level ${game.helpers.speedLevel}! Helpers now work every ${game.helpers.speed} seconds.`);
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Buy rain collector
+        elements.buyRainCollectorBtn.addEventListener('click', () => {
+            if (game.grass >= 200 && !game.specialAutomation.rainCollector) {
+                game.grass -= 200;
+                game.grassSpent += 200;
+                game.specialAutomation.rainCollector = true;
+                
+                addToLog("You bought a rain collector! Your helpers will produce 50% more grass during rain.");
+                updateUI();
+                checkAchievements();
+            }
+        });
+        
+        // Buy night worker
+        elements.buyNightWorkerBtn.addEventListener('click', () => {
+            if (game.grass >= 300 && !game.specialAutomation.nightWorker) {
+                game.grass -= 300;
+                game.grassSpent += 300;
+                game.specialAutomation.nightWorker = true;
+                
+                addToLog("You bought night worker equipment! Your helpers will continue working during the night.");
+                updateUI();
+                updateHelperDisplay();
+                checkAchievements();
+            }
+        });
+        
+        // Buy a new tool
+        function buyTool(toolId) {
+            const tool = game.tools.find(t => t.id === toolId);
+            
+            if (tool && !tool.owned && game.grass >= tool.cost) {
+                game.grass -= tool.cost;
+                game.grassSpent += tool.cost;
+                tool.owned = true;
+                
+                // Equip the new tool
+                game.tools.forEach(t => t.selected = false);
+                tool.selected = true;
+                
+                addToLog(`You bought a ${tool.name}! Now you can cut ${tool.power} grass per action.`);
+                initializeToolsShop();
+                updateUI();
+                checkAchievements();
+            }
+        }
+        
+        // Equip an owned tool
+        function equipTool(toolId) {
+            const tool = game.tools.find(t => t.id === toolId);
+            
+            if (tool && tool.owned) {
+                game.tools.forEach(t => t.selected = false);
+                tool.selected = true;
+                
+                addToLog(`You equipped the ${tool.name}.`);
+                initializeToolsShop();
+                updateUI();
+            }
+        }
+        
+        // Save game to localStorage
+        function saveGame() {
+            try {
+                const saveData = {
+                    version: GAME_VERSION,
+                    timestamp: Date.now(),
+                    gameState: {}
+                };
+                
+                // Copy all important game state properties (exclude achievements and functions)
+                for (const [key, value] of Object.entries(game)) {
+                    if (key !== 'achievements') {
+                        if (typeof value !== 'function') {
+                            saveData.gameState[key] = JSON.parse(JSON.stringify(value));
+                        }
+                    }
+                }
+                
+                const saveString = JSON.stringify(saveData);
+                localStorage.setItem('frogGrassCutterSave', saveString);
+                return true;
+            } catch (error) {
+                console.error('Error saving game:', error);
+                return false;
+            }
+        }
+        
+        // Load game from localStorage
+        function loadGame() {
+            try {
+                const saveString = localStorage.getItem('frogGrassCutterSave');
+                if (!saveString) return false;
+                
+                const saveData = JSON.parse(saveString);
+                
+                // Validate the save data
+                if (!saveData || !saveData.gameState) {
+                    console.error('Invalid save data structure');
+                    return false;
+                }
+                
+                // Version migration if needed
+                if (saveData.version !== GAME_VERSION) {
+                    console.log(`Migrating from version ${saveData.version} to ${GAME_VERSION}`);
+                }
+                
+                // Reset current state before loading
+                resetGameState();
+                
+                // Update all game properties from save data
+                for (const [key, value] of Object.entries(saveData.gameState)) {
+                    if (key !== 'achievements' && key in game) {
+                        game[key] = value;
+                    }
+                }
+                
+                // Ensure we're using the current version
+                game.version = GAME_VERSION;
+                
+                // Reset session-specific data
+                game.sessionStartTime = Date.now();
+                game.sessionGrass = 0;
+                
+                addToLog("Game loaded successfully!");
+                return true;
+            } catch (error) {
+                console.error('Error loading game:', error);
+                return false;
+            }
+        }
+        
+        // Passive stamina regeneration during the day
+        setInterval(() => {
+            if (game.isDay && !game.isSleeping && !game.isResting && game.stamina < game.maxStamina) {
+                game.stamina = Math.min(game.maxStamina, game.stamina + game.staminaRegen);
+                updateUI();
+            }
+        }, 5000); // Small stamina recovery every 5 seconds
+        
+        // Regular game saving
+        setInterval(saveGame, 60 * 1000); // Save every minute
+        
+        // Regular stats updates
+        setInterval(updateStats, 10 * 1000); // Update stats every 10 seconds
+        
+        // Regular achievement checks
+        setInterval(checkAchievements, 5 * 1000); // Check achievements every 5 seconds
+        
+        // Auto save on tab close or navigation
+        window.addEventListener('beforeunload', saveGame);
+        
+        // Dark/light mode based on system preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else if (game.isDay) { // Only remove dark mode if it's daytime
+                document.documentElement.classList.remove('dark');
+            }
+        });
+        
+        // Developer mode for testing
+        function addGrass(amount) {
+            game.grass += amount;
+            game.totalGrass += amount;
+            game.sessionGrass += amount;
+            updateUI();
+            showNotification(`Added ${amount} grass for testing`);
+        }
+        
+        // Initialize the game
+        function initializeGame() {
+            // Try to load saved game
+            const loaded = loadGame();
+            
+            if (!loaded) {
+                addToLog("Welcome to your grass cutting adventure! Start by cutting some grass.");
+            }
+            
+            // Initialize UI components
+            initializeToolsShop();
+            initializeAchievements();
+            updateHelperDisplay();
+            updateUI();
+            
+            // Start game cycles
+            startDayNightCycle();
+            startHelperAutomation();
+        }
+        
+        // Save button
+        elements.saveGameBtn.addEventListener('click', () => {
+            if (saveGame()) {
+                showNotification("Game saved successfully!");
+            } else {
+                showNotification("Failed to save game!");
+            }
+        });
+        
+        // Start the game
+        initializeGame();
+    </script>
+</body>
+</html>
